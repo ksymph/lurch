@@ -2,7 +2,37 @@ local socket = require("socket")
 local lurch = {}
 lurch.__index = lurch
 
-function readFile(filename)
+local RESPONSE_CODE = {
+	[200] = "OK",
+	[404] = "Not Found",
+	[403] = "Forbidden",
+	[500] = "Internal Server Error"
+}
+
+local MIME = {
+	html = "text/html",
+	htm  = "text/html",
+	css  = "text/css",
+	js   = "application/javascript",
+	json = "application/json",
+	xml  = "application/xml",
+	jpg  = "image/jpeg",
+	jpeg = "image/jpeg",
+	png  = "image/png",
+	gif  = "image/gif",
+	bmp  = "image/bmp",
+	svg  = "image/svg+xml",
+	txt  = "text/plain",
+	pdf  = "application/pdf",
+	zip  = "application/zip",
+	mp3  = "audio/mpeg",
+	mp4  = "video/mp4",
+	wav  = "audio/wav",
+	ogg  = "audio/ogg",
+	ico  = "image/x-icon"
+}
+
+local function read(filename)
 	local file, err = io.open(filename, "r")
 	if not file then return err, 404 end
 	local content = file:read("*all")
@@ -11,33 +41,20 @@ function readFile(filename)
 end
 
 function lurch:log(event)
+	-- todo: logging
 	print(event)
 end
 
-local route_metatable = {
-	__newindex = function(routes, key, route_func)
-		local priority = 5
-		if type(key) == "string" then
-
-			--routes[key] = route_func
-		elseif type(key) == "table" then
-
-		end
-	end
-}
-
-function lurch.new(new_settings)
+function lurch.new(settings)
 	local self = setmetatable({}, lurch)
-
-	new_settings = new_settings or {}
-	local default_settings = {
+	settings = settings or {
 		port = 80,
 		backlog = 5,
 		timeout = 5,
 		routes = {}
 	}
-	for id, val in pairs(default_settings) do
-		self[id] = new_settings[id] or val
+	for id, val in pairs(settings) do
+		self[id] = val
 	end
 
 	self.server = assert(socket.tcp())
@@ -53,38 +70,29 @@ function lurch.new(new_settings)
 	return self
 end
 
-function newResponse()
-	local response = {}
-
-	response.headers = {}
-	response.headers["Content-Type"] = "text/html"
-	response.body = ""
-	response.code = 200
-	response.disabled = false
-
-	local codes = {
-		[200] = "OK",
-		[404] = "Not Found",
-		[403] = "Forbidden",
-		[500] = "Internal Server Error"
+local function newResponse()
+	local response = {
+		headers = {["Content-Type"] = "text/html"},
+		body = "",
+		code = 200,
+		disabled = false,
+		foo = "bar"
 	}
 
-	function response:send(error)
+
+	function response:send()
 		if self.disabled then return end
-		local error = error or {}
-		local code = error.code or self.code
-		local response_firstline = "HTTP/1.1 " .. code .. " " .. codes[code]
-		local response_headers = ""
-		local response_body = error.body or self.body or ""
+		local response_raw = "HTTP/1.1 " .. self.code .. " " .. RESPONSE_CODE[self.code] .. "\n"
 
-		self.headers["Content-Length"] = string.len(response_body)
-		for key, val in pairs(self.headers) do
-			response_headers = response_headers .. key .. ": " .. val .. "\n"
+		self.headers["Content-Length"] = string.len(self.body or "")
+		for header_name, header_value in pairs(self.headers) do
+			response_raw = response_raw .. header_name .. ": " .. header_value .. "\n"
 		end
-
-		local response_raw = response_firstline .. "\n" .. response_headers .. "\n" .. response_body
+		
+		response_raw = response_raw .. "\n" .. self.body
 
 		self.client:send(response_raw)
+		--self.client:send("HTTP/1.1 " .. self.code .. " " .. RESPONSE_CODE[self.code] .. "\n\n" .. "HI")
 		self.client:close()
 		self.disabled = true
 	end
@@ -103,39 +111,17 @@ function newResponse()
 	end
 
 	function response:load(path)
-		content, err_code = readFile(path:gsub("^/", ""))
-		if err_code then response:error(err_code, "/" .. content) return else self.body = content end
+		content, err_code = read(path:gsub("^/", ""))
+		if err_code then return err_code, content else self.body = content end
+		
 		local file_extension = path:match("^.+(%..+)$"):sub(2)
-		local mimes = {
-			html = "text/html",
-			htm  = "text/html",
-			css  = "text/css",
-			js   = "application/javascript",
-			json = "application/json",
-			xml  = "application/xml",
-			jpg  = "image/jpeg",
-			jpeg = "image/jpeg",
-			png  = "image/png",
-			gif  = "image/gif",
-			bmp  = "image/bmp",
-			svg  = "image/svg+xml",
-			txt  = "text/plain",
-			pdf  = "application/pdf",
-			zip  = "application/zip",
-			mp3  = "audio/mpeg",
-			mp4  = "video/mp4",
-			wav  = "audio/wav",
-			ogg  = "audio/ogg",
-			ico  = "image/x-icon"
-		}
-		self.headers["Content-Type"] = mimes[file_extension:lower()] or "application/octet-stream"
-
+		self.headers["Content-Type"] = MIME[file_extension:lower()] or "application/octet-stream"
 	end
 
 	return response
 end
 
-function parseRequest(req)
+local function parseRequest(req)
 	local request = {raw = req, headers = {}, method, path, body}
 
 	local lines = {}
@@ -147,17 +133,13 @@ function parseRequest(req)
 
 	local i = 2
 	while lines[i] and lines[i] ~= "" do
-		local header_line = lines[i]
-		local name, value = header_line:match("^(%S+):%s*(.+)")
-		if name and value then
-			request.headers[name] = value
-		end
+		local header_name, header_value = lines[i]:match("^(%S+):%s*(.+)")
+		if header_name and header_value then request.headers[name] = value end
 		i = i + 1
 	end
 
 	request.body = table.concat(lines, "\n", i + 1)
 	return request
-
 end
 --[[
 function lurch:listen()
@@ -175,7 +157,6 @@ end
 --]]
 
 function lurch:listen()
-	-- Prepare a list of sockets to monitor for reading (server socket + active client sockets)
 	local sockets_to_check = {self.server}
 	for _, client in ipairs(self.clients) do
 		table.insert(sockets_to_check, client)
@@ -183,7 +164,6 @@ function lurch:listen()
 
 	local ready_sockets = socket.select(sockets_to_check, nil, self.timeout)
 
-	-- Check if the server socket is ready (indicating a new client connection)
 	for _, sock in ipairs(ready_sockets) do
 		if sock == self.server then
 			local client, err = self.server:accept()
@@ -227,26 +207,40 @@ function lurch:listen()
 	end
 end
 
+lurch.routing = setmetatable({routes = {}}, {
+	__call = function(self, response)
+		return self:routeResponse(response)
+	end
+})
 
+function lurch.routing:new(...) 
+	local route = {pattern = "", priority = 1, func = function() end}
+	for _,val in ipairs({...}) do
+		if type(val) == "string" then route.pattern = val
+			elseif type(val) == "number" then route.priority = val
+			elseif type(val) == "function" then route.func = val
+		end
+	end
+	
+	table.insert(self.routes, route)
+	table.sort(self.routes, function(a, b)
+		return a.priority < b.priority
+	end)
+end
 
-function lurch:route(response)
+function lurch.routing:routeResponse(response)
 	local request_path = response.request.path
 	local matches = {}
+	local outputs = {}
 
-	for pattern, operation in pairs(self.routes) do
-		if string.match(request_path, pattern) then
-			local match = {pattern = pattern, func = operation}
-			table.insert(matches, match)
+	for _,route in ipairs(self.routes) do
+		if string.match(request_path, route.pattern) then
+			local output = route.func(response, request_path)
+			if output then table.insert(outputs, output) end
 		end
 	end
 
-	local match_outputs = {}
-	for i, match in ipairs(matches) do
-		local result = match.func(response, request_path)
-		if result then match_outputs[match.pattern] = result end
-	end
-
-	if match_outputs[1] then return match_outputs else return end
+	if outputs[1] then return outputs end
 end
 
 

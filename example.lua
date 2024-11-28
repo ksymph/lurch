@@ -1,6 +1,6 @@
 local socket = require("socket")
 local lurch = require("lurch")
-local route = lurch.routing()
+local route = lurch.routing
 --[[
 TODO
 logging
@@ -44,15 +44,16 @@ request
 
 
 local srv = lurch.new({port = 9090})
-route:new{"^/api/"} = function(response, request_path)
+route:new{"^/api/", function(response, request_path)
 	response:load(request_path .. ".lua")
 	response.headers["Content-Type"] = "text/html"
 	return "end"
-end
-route:new{"^/index", 1} = function(response, request_path)
-	response:load("/index.html")
+end}
+route:new{"^/index", 1, function(response, request_path)
+	response:load("/example/index.html")
+	print("hello world")
 	return "end"
-end
+end}
 -- srv.routes[".lua$"] = {0, 10, function(response) return end}
 -- srv.routes["^/data/"] = function(response)
 -- 	response:error(404)
@@ -62,14 +63,16 @@ end
 while true do
 	local response, request = srv:listen()
 	if response then
-		route(response)
-
+		-- route(response)
+		-- print(request.path)
+		response:load("example/index.html")
+		-- response.body = "hello world"
 		-- response:load(path)
 		-- response.body = "<h1>Hello world!</h1>"
 		-- response.headers["Last-Modified"] = "Mon, 18 Jul 2016 02:36:04 GMT"
 
 
-		srv:send(response)
+		response:send()
 
 	end
 end
