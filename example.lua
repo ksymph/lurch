@@ -63,9 +63,9 @@ end}
 while true do
 	local response, request = srv:listen()
 	if response then
-		-- route(response)
+		route(response)
 		-- print(request.path)
-		response:load("example/index.html")
+		-- response:load("example/index.html")
 		-- response.body = "hello world"
 		-- response:load(path)
 		-- response.body = "<h1>Hello world!</h1>"
