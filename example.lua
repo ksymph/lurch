@@ -1,6 +1,7 @@
 local socket = require("socket")
 local lurch = require("lurch")
-local route = lurch.routing
+local route = lurch.route
+local template = lurch.template
 --[[
 TODO
 logging

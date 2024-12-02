@@ -4,7 +4,9 @@ A dead simple HTTP server written in lua
 
 ## TODO
 - logging
-- finish routing
-- templating
-- refactoring
+- ~~routing~~
+- templates
 - url parameter parsing
+- improve concurrency
+- improve example
+

@@ -213,7 +213,7 @@ lurch.routing = setmetatable({routes = {}}, {
 	end
 })
 
-function lurch.routing:new(...) 
+function lurch.route:new(...) 
 	local route = {pattern = "", priority = 1, func = function() end}
 	for _,val in ipairs({...}) do
 		if type(val) == "string" then route.pattern = val
@@ -228,7 +228,7 @@ function lurch.routing:new(...)
 	end)
 end
 
-function lurch.routing:routeResponse(response)
+function lurch.route:routeResponse(response)
 	local request_path = response.request.path
 	local matches = {}
 	local outputs = {}
