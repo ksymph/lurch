@@ -173,7 +173,7 @@ local function parseRequest(req)
 		table.insert(lines, line)
 	end
 
-	request.method, request.path = lines[1]:match("^(%S+)%s+([^?]+)")
+	request.method, request.path = lines[1]:match("^(%S+)%s+([^?%s]+)")
 
 	local query_string = lines[1]:match("?(.+)%s") or ""
 	for key, value in query_string:gmatch("([^&=?]+)=([^&=?]+)") do
