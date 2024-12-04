@@ -166,14 +166,21 @@ local function newResponse()
 end
 
 local function parseRequest(req)
-	local request = {raw = req, headers = {}, method, path, body}
+	local request = {raw = req, headers = {}, params = {}, path = ""}
 
 	local lines = {}
 	for line in req:gmatch("[^\r\n]+") do
 		table.insert(lines, line)
 	end
 
-	request.method, request.path = lines[1]:match("^(%S+)%s+(%S+)")
+	request.method, request.path = lines[1]:match("^(%S+)%s+([^?]+)")
+
+	local query_string = lines[1]:match("?(.+)%s") or ""
+	for key, value in query_string:gmatch("([^&=?]+)=([^&=?]+)") do
+		request.params[key] = value:gsub("%%([0-9a-fA-F][0-9a-fA-F])", function(hex)
+			return string.char(tonumber(hex, 16))
+		end)
+	end
 
 	local i = 2
 	while lines[i] and lines[i] ~= "" do
