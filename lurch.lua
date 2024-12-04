@@ -32,12 +32,50 @@ local MIME = {
 	ico  = "image/x-icon"
 }
 
-local function read(filename)
-	local file, err = io.open(filename, "r")
+function lurch.read(path)
+	local file, err = io.open(path, "r")
 	if not file then return err, 404 end
 	local content = file:read("*all")
 	file:close()
-	return content
+
+	local filetype = MIME[path:match("^.+(%..+)$"):sub(2):lower()] or "application/octet-stream"
+
+	return content, filetype
+end
+
+function lurch.parse(str, environment)
+	local env = _G
+	for k,v in pairs(environment or {}) do env[k]=v end
+	local code =
+		"return function(_)" ..
+			"local result = '' " ..
+			"local function _(s) " ..
+				"result = result .. tostring(s or '') " ..
+			"end " ..
+			"_[=[" .. str:
+				gsub("[][]=[][]", ']=]_"%1"_[=['):
+				gsub("<%%=", "]=]_("):
+				gsub("<%%", "]=]_("):
+				gsub("%%>", ")_[=["):
+				gsub("<%?", "]=] "):
+				gsub("%?>", " _[=[") ..
+			"]=] " ..
+		"return result end"
+
+	local func = load(code, "template", "t", env)
+	local compiled = func()
+	return compiled()
+end
+
+function lurch.sanitize(str)
+	return tostring(str or ""):gsub("[\">/<'&]", {
+		["&"] = "&amp;",
+		["<"] = "&lt;",
+		[">"] = "&gt;",
+		['"'] = "&quot;",
+		["'"] = "&#39;",
+		["/"] = "&#47;"
+	})
 end
 
 function lurch:log(event)
@@ -53,6 +91,7 @@ function lurch.new(settings)
 		timeout = 5,
 		routes = {}
 	}
+	self.routes = {}
 	for id, val in pairs(settings) do
 		self[id] = val
 	end
@@ -88,7 +127,7 @@ local function newResponse()
 		for header_name, header_value in pairs(self.headers) do
 			response_raw = response_raw .. header_name .. ": " .. header_value .. "\n"
 		end
-		
+
 		response_raw = response_raw .. "\n" .. self.body
 
 		self.client:send(response_raw)
@@ -111,14 +150,19 @@ local function newResponse()
 	end
 
 	function response:load(path)
-		content, err_code = read(path:gsub("^/", ""))
-		if err_code then return err_code, content else self.body = content end
-		
-		local file_extension = path:match("^.+(%..+)$"):sub(2)
-		self.headers["Content-Type"] = MIME[file_extension:lower()] or "application/octet-stream"
+		content, filetype = lurch.read(path:gsub("^/", ""))
+		self.body = content
+		self.headers["Content-Type"] = filetype
+	end
+
+	function response:tmpload(path)
+		content = lurch.read(path:gsub("^/", ""))
+		self.body = lurch.parse(content)
+		self.headers["Content-Type"] = "text/html"
 	end
 
 	return response
+
 end
 
 local function parseRequest(req)
@@ -207,13 +251,7 @@ function lurch:listen()
 	end
 end
 
-lurch.routing = setmetatable({routes = {}}, {
-	__call = function(self, response)
-		return self:routeResponse(response)
-	end
-})
-
-function lurch.route:new(...) 
+function lurch:addRoute(...)
 	local route = {pattern = "", priority = 1, func = function() end}
 	for _,val in ipairs({...}) do
 		if type(val) == "string" then route.pattern = val
@@ -221,14 +259,13 @@ function lurch.route:new(...)
 			elseif type(val) == "function" then route.func = val
 		end
 	end
-	
 	table.insert(self.routes, route)
 	table.sort(self.routes, function(a, b)
 		return a.priority < b.priority
 	end)
 end
 
-function lurch.route:routeResponse(response)
+function lurch:route(response)
 	local request_path = response.request.path
 	local matches = {}
 	local outputs = {}
