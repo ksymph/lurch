@@ -37,34 +37,37 @@ function lurch.read(path)
 	if not file then return err, 404 end
 	local content = file:read("*all")
 	file:close()
-	
+
 	local filetype = MIME[path:match("^.+(%..+)$"):sub(2):lower()] or "application/octet-stream"
-	
+
 	return content, filetype
 end
 
-function lurch.parseTemplate(str)
-	str = str or "" 
-	local parsed_string = 
-			"return function(_)" .. 
-			"function __(...)" ..
-			"_(sanitize(...))" ..
+function lurch.parse(str, environment)
+	local env = _G
+	for k,v in pairs(environment or {}) do env[k]=v end
+	local code =
+		"return function(_)" ..
+			"local result = '' " ..
+			"local function _(s) " ..
+				"result = result .. tostring(s or '') " ..
 			"end " ..
-			"_[=[" ..
-		content:
-			gsub("[][]=[][]", ']=]_"%1"_[=['):
-			gsub("<%%=", "]=]_("):
-			gsub("<%%", "]=]__("):
-			gsub("%%>", ")_[=["):
-			gsub("<%?", "]=] "):
-			gsub("%?>", " _[=[") ..
-		"]=] " ..
-	"end"
-	
-	return load(parsed_string)
+			"_[=[" .. str:
+				gsub("[][]=[][]", ']=]_"%1"_[=['):
+				gsub("<%%=", "]=]_("):
+				gsub("<%%", "]=]_("):
+				gsub("%%>", ")_[=["):
+				gsub("<%?", "]=] "):
+				gsub("%?>", " _[=[") ..
+			"]=] " ..
+		"return result end"
+
+	local func = load(code, "template", "t", env)
+	local compiled = func()
+	return compiled()
 end
 
-local function sanitize(str)
+function lurch.sanitize(str)
 	return tostring(str or ""):gsub("[\">/<'&]", {
 		["&"] = "&amp;",
 		["<"] = "&lt;",
@@ -124,7 +127,7 @@ local function newResponse()
 		for header_name, header_value in pairs(self.headers) do
 			response_raw = response_raw .. header_name .. ": " .. header_value .. "\n"
 		end
-		
+
 		response_raw = response_raw .. "\n" .. self.body
 
 		self.client:send(response_raw)
@@ -148,18 +151,18 @@ local function newResponse()
 
 	function response:load(path)
 		content, filetype = lurch.read(path:gsub("^/", ""))
-		self.body = self.body .. content
+		self.body = content
 		self.headers["Content-Type"] = filetype
 	end
-	
+
 	function response:tmpload(path)
 		content = lurch.read(path:gsub("^/", ""))
-		self.body = self.body .. lurch.parseTemplate(content)
+		self.body = lurch.parse(content)
 		self.headers["Content-Type"] = "text/html"
 	end
-	
+
 	return response
-	
+
 end
 
 local function parseRequest(req)
@@ -248,7 +251,7 @@ function lurch:listen()
 	end
 end
 
-function lurch:addRoute(...) 
+function lurch:addRoute(...)
 	local route = {pattern = "", priority = 1, func = function() end}
 	for _,val in ipairs({...}) do
 		if type(val) == "string" then route.pattern = val
@@ -266,7 +269,7 @@ function lurch:route(response)
 	local request_path = response.request.path
 	local matches = {}
 	local outputs = {}
-	
+
 	for _,route in ipairs(self.routes) do
 		if string.match(request_path, route.pattern) then
 			local output = route.func(response, request_path)
