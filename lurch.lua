@@ -150,15 +150,15 @@ local function newResponse()
 		self:send(error)
 	end
 
-	function response:load(path)
+	function response:load(path, overwrite)
 		content, filetype = lurch.read(path:gsub("^/", ""))
-		self.body = content
+		self.body = overwrite and content or self.body .. content
 		self.headers["Content-Type"] = filetype
 	end
 
-	function response:tmpload(path)
+	function response:tmpload(path, overwrite)
 		content = lurch.read(path:gsub("^/", ""))
-		self.body = lurch.parse(content)
+		self.body = overwrite and lurch.parse(content) or self.body .. lurch.parse(content)
 		self.headers["Content-Type"] = "text/html"
 	end
 
