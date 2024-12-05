@@ -45,6 +45,7 @@ end
 
 function lurch.parse(str, environment)
 	local env = _G
+	env.parse, env.read = lurch.parse, lurch.read
 	environment = type(environment) == "table" and environment or {}
 	for k,v in pairs(environment) do env[k]=v end
 	local code =
