@@ -262,6 +262,7 @@ function lurch:addRoute(...)
 	local route = {pattern = "", priority = 1, func = function() end}
 	for _,val in ipairs({...}) do
 		if type(val) == "string" then route.pattern = val
+			elseif type(val) == "table" then route.pattern = val
 			elseif type(val) == "number" then route.priority = val
 			elseif type(val) == "function" then route.func = val
 		end
@@ -278,9 +279,12 @@ function lurch:route(response)
 	local outputs = {}
 
 	for _,route in ipairs(self.routes) do
-		if string.match(request_path, route.pattern) then
-			local output = route.func(response, request_path)
-			if output then table.insert(outputs, output) end
+		local patterns = type(route.pattern) == "table" and route.pattern or {route.pattern}
+		for _,pattern in ipairs(patterns) do
+			if string.match(request_path, pattern) then
+				local output = route.func(response, request_path)
+				if output then table.insert(outputs, output) end
+			end
 		end
 	end
 
