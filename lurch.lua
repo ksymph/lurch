@@ -45,6 +45,7 @@ end
 
 function lurch.parse(str, environment)
 	local env = _G
+	env.parse, env.read = lurch.parse, lurch.read
 	for k,v in pairs(environment or {}) do env[k]=v end
 	local code =
 		"return function(_)" ..
