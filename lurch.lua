@@ -51,9 +51,8 @@ function lurch.parse(str, environment)
 	local code =
 		"return function(_)" ..
 			"local result = '' " ..
-			"local function _(s) " ..
-				"result = result .. tostring(s or '') " ..
-			"end " ..
+			"local function _(s) result = result .. tostring(s or '') end " ..
+			"local function write(s) result = result .. tostring(s or '') end " ..
 			"_[=[" .. str:
 				gsub("[][]=[][]", ']=]_"%1"_[=['):
 				gsub("<%%=", "]=]_("):
