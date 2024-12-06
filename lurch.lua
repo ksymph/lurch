@@ -93,6 +93,27 @@ function lurch.new(settings)
 		routes = {}
 	}
 	self.routes = {}
+	function self.routes:addRoute(route)
+		route.path = route.path or ""
+		route.func = route.func or function() end
+		route.final = route.final or false
+		route.order = route.order or 1
+		table.insert(self, route)
+		table.sort(self, function(a, b)
+			return a.order < b.order
+		end)
+	end
+	setmetatable(self.routes, {
+		__call = function(routing_table, new_routes)
+			if new_routes.path then
+				routing_table:addRoute(new_routes)
+			else
+				for _,route in ipairs(new_routes) do
+					routing_table:addRoute(route)
+				end
+			end
+		end
+	})
 	for id, val in pairs(settings) do
 		self[id] = val
 	end
@@ -259,29 +280,13 @@ function lurch:listen()
 	end
 end
 
-function lurch:addRoute(...)
-	local route = {pattern = "", priority = 1, func = function() end}
-	for _,val in ipairs({...}) do
-		if type(val) == "string" then route.pattern = val
-			elseif type(val) == "table" then route.pattern = val
-			elseif type(val) == "number" then route.priority = val
-			elseif type(val) == "function" then route.func = val
-			elseif type(val) == "boolean" then route.final = val
-		end
-	end
-	table.insert(self.routes, route)
-	table.sort(self.routes, function(a, b)
-		return a.priority < b.priority
-	end)
-end
-
 function lurch:route(response)
 	local request_path = response.request.path
 	local matches = {}
 	local outputs = {}
 
 	for _,route in ipairs(self.routes) do
-		local patterns = type(route.pattern) == "table" and route.pattern or {route.pattern}
+		local patterns = type(route.path) == "table" and route.path or {route.path}
 		for _,pattern in ipairs(patterns) do
 			if string.match(request_path, pattern) then
 				local output = route.func(response, request_path)
