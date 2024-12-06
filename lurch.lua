@@ -286,13 +286,16 @@ function lurch:route(response)
 
 	for _,route in ipairs(self.routes) do
 		local patterns = type(route.path) == "table" and route.path or {route.path}
+		local is_final = false
 		for _,pattern in ipairs(patterns) do
 			if string.match(request_path, pattern) then
 				local output = route.func(response, request_path)
 				if output then table.insert(outputs, output) end
+				is_final = route.final
+				break
 			end
 		end
-		if route.final then break end
+		if is_final then break end
 	end
 
 	if outputs[1] then return outputs end
