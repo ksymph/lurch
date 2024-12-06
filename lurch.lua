@@ -266,6 +266,7 @@ function lurch:addRoute(...)
 			elseif type(val) == "table" then route.pattern = val
 			elseif type(val) == "number" then route.priority = val
 			elseif type(val) == "function" then route.func = val
+			elseif type(val) == "boolean" then route.final = val
 		end
 	end
 	table.insert(self.routes, route)
@@ -287,6 +288,7 @@ function lurch:route(response)
 				if output then table.insert(outputs, output) end
 			end
 		end
+		if route.final then break end
 	end
 
 	if outputs[1] then return outputs end
