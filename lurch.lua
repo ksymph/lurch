@@ -12,6 +12,7 @@ local RESPONSE_CODE = {
 local MIME = {
 	html = "text/html",
 	htm  = "text/html",
+	tpl  = "text/html",
 	css  = "text/css",
 	js   = "application/javascript",
 	json = "application/json",
@@ -172,15 +173,13 @@ local function newResponse()
 	end
 
 	function response:load(path, overwrite)
-		content, filetype = lurch.read(path:gsub("^/", ""))
+		content, self.headers["Content-Type"] = lurch.read(path:gsub("^/", ""))
 		self.body = overwrite and content or self.body .. content
-		self.headers["Content-Type"] = filetype
 	end
 
 	function response:tmpload(path, overwrite)
-		content = lurch.read(path:gsub("^/", ""))
+		content, self.headers["Content-Type"] = lurch.read(path:gsub("^/", ""))
 		self.body = overwrite and lurch.parse(content) or self.body .. lurch.parse(content)
-		self.headers["Content-Type"] = "text/html"
 	end
 
 	return response
