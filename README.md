@@ -1,6 +1,8 @@
 # 🧟 Lurch
 A dead simple HTTP server written in lua
 
+template submodule derived from [lua-template](https://github.com/dannote/lua-template)
+
 
 ## TODO
 - logging
@@ -12,6 +14,5 @@ A dead simple HTTP server written in lua
 - caching
 - improve example
 - documentation
+- ensure compatibility across lua 5.1 - 5.4 and luajit
 
-###
-template submodule derived from [lua-template](https://github.com/dannote/lua-template)
