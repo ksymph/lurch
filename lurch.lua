@@ -45,10 +45,9 @@ function lurch.read(path)
 end
 
 function lurch.parse(str, environment)
-	local env = _G
+	-- ensure var environment is table for parse(read()) shorthand, set template env __index to _G, add parse and read to env
+	local env = setmetatable(type(environment) == "table" and environment or {}, { __index = _G })
 	env.parse, env.read = lurch.parse, lurch.read
-	environment = type(environment) == "table" and environment or {}
-	for k,v in pairs(environment) do env[k]=v end
 	local code =
 		"return function(_)" ..
 			"local result = '' " ..
